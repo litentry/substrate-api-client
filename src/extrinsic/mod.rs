@@ -22,6 +22,7 @@
 pub mod xt_primitives;
 pub mod contract;
 pub mod balances;
+pub mod litentry;
 
 /// Generates the extrinsic's call field for a given module and call passed as &str
 /// # Arguments
