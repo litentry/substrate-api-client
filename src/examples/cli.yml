@@ -17,3 +17,9 @@ args:
       long: node-port
       help: Set the websocket port to listen for substrate events
       takes_value: true
+  - identity-hash:
+      short: ih
+      long: identity-hash
+      help: Set the identity when create token
+      takes_value: true
+

@@ -5,6 +5,7 @@ authors = ["Supercomputing Systems AG <info@scs.ch>"]
 edition = "2018"
 
 [dependencies]
+rand = "0.7.1"
 env_logger = "0.6"
 ws = "0.7"
 hex = "0.3"
@@ -144,3 +145,8 @@ path = "src/examples/example_custom_storage_struct.rs"
 [[example]]
 name = "example_create_identity"
 path = "src/examples/example_create_identity.rs"
+
+[[example]]
+name = "example_create_token"
+path = "src/examples/example_create_token.rs"
+
