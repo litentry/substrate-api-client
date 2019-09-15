@@ -1,4 +1,4 @@
 cargo run --example example_create_identity -- --ns 192.168.2.158 --node-port 9944
 ##
-cargo run --example example_create_identity -- --ns 192.168.2.158 --node-port 9944 --ih 0xcc9a2a0a172eefdbb6a1ff1b569e1f84a82f36008818b13089995b2b2960fff9
+cargo run --example example_create_identity -- --ns 192.168.2.158 --node-port 9944 --identity-hash 0xcc9a2a0a172eefdbb6a1ff1b569e1f84a82f36008818b13089995b2b2960fff9
 
