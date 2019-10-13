@@ -16,7 +16,7 @@
 */
 
 use codec::alloc::string::FromUtf8Error;
-use log::{info, debug};
+use log::{debug, info};
 use metadata::{DecodeDifferent, RuntimeMetadata, RuntimeMetadataPrefixed};
 use serde::{Deserialize, Serialize};
 
@@ -30,15 +30,55 @@ pub fn pretty_format(metadata: &RuntimeMetadataPrefixed) -> Result<String, FromU
 
 pub type NodeMetadata = Vec<Module>;
 
+pub trait Print {
+    fn print_events(&self);
+    fn print_calls(&self);
+}
+
+impl Print for NodeMetadata {
+    fn print_events(&self) {
+        for m in self {
+            m.print_events();
+        }
+    }
+
+    fn print_calls(&self) {
+        for m in self {
+            m.print_calls()
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Module {
     pub name: String,
     pub calls: Vec<Call>,
+    pub events: Vec<Event>,
 }
 
 impl Module {
     fn new(name: &DecodeDifferent<&'static str, std::string::String>) -> Module {
-        Module { name: format!("{:?}", name).replace("\"", ""), calls: Vec::<Call>::new() }
+        Module {
+            name: format!("{:?}", name).replace("\"", ""),
+            calls: Vec::<Call>::new(),
+            events: Vec::<Event>::new()
+        }
+    }
+
+    pub fn print_events(&self) {
+        println!("----------------- Events for Module: {} -----------------\n", self.name);
+        for e in &self.events {
+            println!("{:?}", e);
+        }
+        println!()
+    }
+
+    pub fn print_calls(&self) {
+        println!("----------------- Calls for Module: {} -----------------\n", self.name);
+        for e in &self.calls {
+            println!("{:?}", e);
+        }
+        println!()
     }
 }
 
@@ -50,7 +90,23 @@ pub struct Call {
 
 impl Call {
     fn new(name: &DecodeDifferent<&'static str, std::string::String>) -> Call {
-        Call { name: format!("{:?}", name).replace("\"", ""), args: Vec::<Arg>::new() }
+        Call {
+            name: format!("{:?}", name).replace("\"", ""),
+            args: Vec::<Arg>::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct Event {
+    pub name: String,
+    // in this case the only the argument types are provided as strings
+    pub args: Vec<String>,
+}
+
+impl Event {
+    fn new(name: &DecodeDifferent<&'static str, std::string::String>) -> Event {
+        Event { name: format!("{:?}", name).replace("\"", ""), args: Vec::<String>::new() }
     }
 }
 
@@ -61,12 +117,18 @@ pub struct Arg {
 }
 
 impl Arg {
-    fn new(name: &DecodeDifferent<&'static str, std::string::String>, ty: &DecodeDifferent<&'static str, std::string::String>) -> Arg {
-        Arg { name: format!("{:?}", name).replace("\"", ""), ty: format!("{:?}", ty).replace("\"", "") }
+    fn new(
+        name: &DecodeDifferent<&'static str, std::string::String>,
+        ty: &DecodeDifferent<&'static str, std::string::String>,
+    ) -> Arg {
+        Arg {
+            name: format!("{:?}", name).replace("\"", ""),
+            ty: format!("{:?}", ty).replace("\"", ""),
+        }
     }
 }
 
-pub fn parse_metadata_into_module_and_call(metadata: &RuntimeMetadataPrefixed) -> Vec<Module> {
+pub fn parse_metadata(metadata: &RuntimeMetadataPrefixed) -> Vec<Module> {
     let mut mod_vec = Vec::<Module>::new();
     match &metadata.1 {
         RuntimeMetadata::V7(value) => {
@@ -94,24 +156,53 @@ pub fn parse_metadata_into_module_and_call(metadata: &RuntimeMetadataPrefixed) -
                                             for arg in arguments {
                                                 _call.args.push(Arg::new(&arg.name, &arg.ty));
                                             }
+                                        }
+                                        _ => unreachable!(
+                                            "All calls have at least the 'who' argument; qed"
+                                        ),
+                                    }
+                                    _mod.calls.push(_call);
+                                }
+                            }
+                            _ => debug!("No calls for this module"),
+                        }
+
+                        match &module.event {
+                            Some(DecodeDifferent::Decoded(event)) => {
+                                debug!("-------------------- events ----------------");
+                                debug!("{:?}", event);
+                                if event.is_empty() {
+                                    // indices modules does for some reason list `Some([])' as calls and is thus counted in the call enum
+                                    // there might be others doing the same.
+                                    _mod.calls.push(Default::default())
+                                }
+
+                                for e in event {
+                                    let mut _event = Event::new(&e.name);
+                                    match &e.arguments {
+                                        DecodeDifferent::Decoded(arguments) => {
+                                            for arg in arguments {
+                                                _event.args.push(arg.to_string());
+                                            }
                                         },
                                         _ => unreachable!("All calls have at least the 'who' argument; qed"),
                                     }
-                                    _mod.calls.push(_call);
+                                    _mod.events.push(_event);
                                 }
                             },
                             _ => debug!("No calls for this module"),
                         }
+
                         mod_vec.push(_mod);
                     }
                     for m in &mod_vec {
                         info!("{:?}", m);
                     }
                     debug!("successfully decoded metadata");
-                },
+                }
                 _ => unreachable!("There are always modules present; qed"),
             }
-        },
+        }
         _ => panic!("Unsupported metadata"),
     }
     mod_vec

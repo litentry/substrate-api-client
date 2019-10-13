@@ -15,14 +15,17 @@
 
 */
 
+use rstd::prelude::*;
+
+#[cfg(feature = "std")]
 use std::fmt;
 
 use codec::{Compact, Decode, Encode};
 use indices::address::Address;
-use node_primitives::Signature;
 use primitive_types::H256;
 use primitives::blake2_256;
 use runtime_primitives::generic::Era;
+use runtime_primitives::AnySignature as Signature;
 
 pub type GenericAddress = Address<[u8; 32], u32>;
 
@@ -31,7 +34,8 @@ pub type GenericAddress = Address<[u8; 32], u32>;
 /// Order is (CheckVersion, CheckGenesis, Check::Era, CheckNonce, CheckWeight, TakeFees). This can
 /// be locked up in the System module. Fields that are merely PhantomData are not encoded and are
 /// therefore omitted here.
-#[derive(Decode, Encode, Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "std",derive(Debug))]
+#[derive(Decode, Encode, Clone, Eq, PartialEq)]
 pub struct GenericExtra(Era, Compact<u32>, Compact<u128>);
 
 impl GenericExtra {
@@ -51,8 +55,9 @@ pub type AdditionalSigned = (u32, H256, H256, (), (), ());
 #[derive(Encode)]
 pub struct SignedPayload<Call>((Call, GenericExtra, AdditionalSigned));
 
+
 impl<Call> SignedPayload<Call> where
-    Call: Encode + fmt::Debug,
+    Call: Encode ,
 {
     pub fn from_raw(call: Call, extra: GenericExtra, additional_signed: AdditionalSigned) -> Self {
         Self((call, extra, additional_signed))
@@ -76,7 +81,7 @@ impl<Call> SignedPayload<Call> where
 /// The SingedExtra used does not need to implement SingedExtension here.
 pub struct UncheckedExtrinsicV3<Call>
     where
-        Call: Encode + fmt::Debug,
+        Call: Encode ,
 {
     pub signature: Option<(GenericAddress, Signature, GenericExtra)>,
     pub function: Call,
@@ -84,7 +89,7 @@ pub struct UncheckedExtrinsicV3<Call>
 
 impl<Call> UncheckedExtrinsicV3<Call>
     where
-        Call: Encode + fmt::Debug,
+        Call: Encode ,
 {
     pub fn new_signed(
         function: Call,
@@ -97,7 +102,8 @@ impl<Call> UncheckedExtrinsicV3<Call>
             function,
         }
     }
-
+    
+    #[cfg(feature = "std")]
     pub fn hex_encode(&self) -> String {
         let mut hex_str = hex::encode(self.encode());
         hex_str.insert_str(0, "0x");
@@ -105,18 +111,24 @@ impl<Call> UncheckedExtrinsicV3<Call>
     }
 }
 
+#[cfg(feature = "std")]
 impl<Call> fmt::Debug for UncheckedExtrinsicV3<Call>
-    where
-        Call: fmt::Debug + Encode,
+where
+    Call: fmt::Debug + Encode,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "UncheckedExtrinsic({:?}, {:?})", self.signature.as_ref().map(|x| (&x.0, &x.2)), self.function)
+        write!(
+            f,
+            "UncheckedExtrinsic({:?}, {:?})",
+            self.signature.as_ref().map(|x| (&x.0, &x.2)),
+            self.function
+        )
     }
 }
 
 impl<Call> Encode for UncheckedExtrinsicV3<Call>
     where
-        Call: Encode + fmt::Debug,
+        Call: Encode,
 {
     fn encode(&self) -> Vec<u8> {
         encode_with_vec_prefix::<Self, _>(|v| {
@@ -124,7 +136,7 @@ impl<Call> Encode for UncheckedExtrinsicV3<Call>
                 Some(s) => {
                     v.push(3 as u8 | 0b1000_0000);
                     s.encode_to(v);
-                },
+                }
                 None => {
                     v.push(3 as u8 & 0b0111_1111);
                 }
@@ -136,7 +148,7 @@ impl<Call> Encode for UncheckedExtrinsicV3<Call>
 
 /// Same function as in primitives::generic. Needed to be copied as it is private there.
 fn encode_with_vec_prefix<T: Encode, F: Fn(&mut Vec<u8>)>(encoder: F) -> Vec<u8> {
-    let size = std::mem::size_of::<T>();
+    let size = rstd::mem::size_of::<T>();
     let reserve = match size {
         0..=0b0011_1111 => 1,
         0..=0b0011_1111_1111_1111 => 2,

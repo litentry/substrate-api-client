@@ -15,9 +15,12 @@
 
 */
 
+use rstd::prelude::*;
 use codec::Compact;
-use node_primitives::Hash;
+use primitives::H256 as Hash;
 
+
+#[cfg(feature = "std")]
 use crate::{Api,compose_extrinsic};
 
 use super::xt_primitives::*;
@@ -29,42 +32,67 @@ pub const CONTRACTS_CALL: &str = "call";
 
 pub type ContractPutCodeFn = ([u8; 2], Compact<u64>, Vec<u8>);
 pub type ContractCreateFn = ([u8; 2], Compact<u128>, Compact<u64>, Hash, Vec<u8>);
-pub type ContractCallFn = ([u8; 2], GenericAddress, Compact<u128>, Compact<u64>, Vec<u8>);
+pub type ContractCallFn = (
+    [u8; 2],
+    GenericAddress,
+    Compact<u128>,
+    Compact<u64>,
+    Vec<u8>,
+);
 
 pub type ContractPutCodeXt = UncheckedExtrinsicV3<ContractPutCodeFn>;
 pub type ContractCreateXt = UncheckedExtrinsicV3<ContractCreateFn>;
 pub type ContractCallXt = UncheckedExtrinsicV3<ContractCallFn>;
 
+#[cfg(feature = "std")]
 pub fn put_code(api: Api, gas_limit: u64, code: Vec<u8>) -> ContractPutCodeXt {
     compose_extrinsic!(
-		api,
-		CONTRACTS_MODULE,
-		CONTRACTS_PUT_CODE,
-		Compact(gas_limit),
-		code
-	)
+        api,
+        CONTRACTS_MODULE,
+        CONTRACTS_PUT_CODE,
+        Compact(gas_limit),
+        code
+    )
 }
 
-pub fn create(api: Api, endowment: u128, gas_limit: u64, code_hash: Hash, data: Vec<u8>) -> ContractCreateXt {
+
+#[cfg(feature = "std")]
+pub fn create(
+    api: Api,
+    endowment: u128,
+    gas_limit: u64,
+    code_hash: Hash,
+    data: Vec<u8>,
+) -> ContractCreateXt {
+
     compose_extrinsic!(
-		api,
-		CONTRACTS_MODULE,
-		CONTRACTS_CREATE,
-		Compact(endowment),
-		Compact(gas_limit),
-		code_hash,
-		data
-	)
+        api,
+        CONTRACTS_MODULE,
+        CONTRACTS_CREATE,
+        Compact(endowment),
+        Compact(gas_limit),
+        code_hash,
+        data
+    )
 }
 
-pub fn call(api: Api, dest: GenericAddress, value: u128, gas_limit: u64, data: Vec<u8>) -> ContractCallXt {
+
+#[cfg(feature = "std")]
+pub fn call(
+    api: Api,
+    dest: GenericAddress,
+    value: u128,
+    gas_limit: u64,
+    data: Vec<u8>,
+) -> ContractCallXt {
+
     compose_extrinsic!(
-		api,
-		CONTRACTS_MODULE,
-		CONTRACTS_CALL,
-		dest,
-		Compact(value),
-		Compact(gas_limit),
-		data
-	)
+        api,
+        CONTRACTS_MODULE,
+        CONTRACTS_CALL,
+        dest,
+        Compact(value),
+        Compact(gas_limit),
+        data
+    )
 }

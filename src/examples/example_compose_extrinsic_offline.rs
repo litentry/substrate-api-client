@@ -13,15 +13,17 @@
     limitations under the License.
 */
 
-//! This examples shows how to use the compose_extrinsic macro to create an extrinsic for any (custom)
-//! module, whereas the desired module and call are supplied as a string.
+//! This examples shows how to use the compose_extrinsic_offline macro which generates an extrinsic
+//! without asking the node for nonce and does not need to know the metadata
 
 use clap::{load_yaml, App};
 
-// compose_extrinsic is only found if extrinsic is imported as well
+use node_runtime::{BalancesCall, Call};
+
+// compose_extrinsic_offline is only found if extrinsic is imported as well
 use substrate_api_client::{
-    compose_extrinsic,
-    crypto::{AccountKey, CryptoKind},
+    compose_extrinsic_offline,
+    crypto::{AccountKey, Crypto, CryptoKind, Sr25519},
     extrinsic, Api,
 };
 
@@ -33,17 +35,21 @@ fn main() {
     let from = AccountKey::new("//Alice", Some(""), CryptoKind::Sr25519);
     let api = Api::new(format!("ws://{}", url)).set_signer(from);
 
-    // set the recipient
-    let to = AccountKey::public_from_suri("//Bob", Some(""), CryptoKind::Sr25519);
+    println!(
+        "[+] Alice's Account Nonce is {}\n",
+        api.get_nonce().unwrap()
+    );
 
-    // call Balances::transfer
-    // the names are given as strings
-    let xt = compose_extrinsic!(
-        api.clone(),
-        "Balances",
-        "transfer",
-        GenericAddress::from(to),
-        Compact(42 as u128)
+    // define the recipient
+    let to = Sr25519::public_from_suri("//Bob", Some(""));
+
+    // compose the extrinsic with all the element
+    let xt = compose_extrinsic_offline!(
+        api.clone().signer.unwrap(),
+        Call::Balances(BalancesCall::transfer(to.clone().into(), 42)),
+        api.get_nonce().unwrap(),
+        api.genesis_hash,
+        api.runtime_version.spec_version
     );
 
     println!("[+] Composed Extrinsic:\n {:?}\n", xt);
