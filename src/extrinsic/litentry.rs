@@ -12,7 +12,7 @@ pub type RegisterIdentityFn = ([u8; 2]);
 pub type RegisterIdentityXt = UncheckedExtrinsicV3<RegisterIdentityFn>;
 
 // pub type CreateAuthorizedTokenFn = ([u8; 2], GenericAddress, Hash, Compact<u128>, Compact<u64>, Compact<u64>, Compact<u64>);
-pub type CreateAuthorizedTokenFn = ([u8; 2], GenericAddress, Hash, u128, u64, u64, u64);
+pub type CreateAuthorizedTokenFn = ([u8; 2], GenericAddress, Hash, u128, Vec<u8>, u64, u64);
 pub type CreateAuthorizedTokenXt = UncheckedExtrinsicV3<CreateAuthorizedTokenFn>;
 
 pub fn register_identity(api: Api) -> RegisterIdentityXt {
@@ -24,7 +24,7 @@ pub fn register_identity(api: Api) -> RegisterIdentityXt {
 }
 
 pub fn create_authorized_token(api: Api, to: GenericAddress, identity_hash: Hash,
-                               cost: u128, data: u64, data_type: u64, expired: u64) -> CreateAuthorizedTokenXt {
+                               cost: u128, data: Vec<u8>, data_type: u64, expired: u64) -> CreateAuthorizedTokenXt {
     compose_extrinsic!(
         api,
         LITENTRY_MODULE,
