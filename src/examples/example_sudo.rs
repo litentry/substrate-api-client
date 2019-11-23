@@ -19,10 +19,10 @@
 use clap::{load_yaml, App};
 use keyring::AccountKeyring;
 use primitives::{sr25519, crypto::Pair};
-
+use codec::Compact;
 use substrate_api_client::{
-    compose_extrinsic,
-    extrinsic::xt_primitives::{AccountId, UncheckedExtrinsicV3},
+    compose_extrinsic, compose_call,
+    extrinsic::xt_primitives::{AccountId, UncheckedExtrinsicV3, GenericAddress},
     Api,
 };
 
@@ -31,23 +31,27 @@ fn main() {
     let url = get_node_url_from_cli();
 
     // initialize api and set the signer (sender) that is used to sign the extrinsics
-    let from = AccountKeyring::Alice.pair();
-    let api = Api::new(format!("ws://{}", url)).set_signer(from);
+    let sudoer = AccountKeyring::Alice.pair();
+    let api = Api::new(format!("ws://{}", url)).set_signer(sudoer.clone());
 
-    // set the recipient
+    // set the recipient of newly issued funds
     let to = AccountId::from(AccountKeyring::Bob);
 
-    // call Balances::transfer
-    // the names are given as strings
+    // this call can only be called by sudo
+    let call = compose_call!(
+            api.metadata.clone(),
+            "Balances",
+            "set_balance",
+            GenericAddress::from(to.0.clone()),
+            Compact(42 as u128),
+            Compact(42 as u128)
+    );
     let xt: UncheckedExtrinsicV3<_, sr25519::Pair>  = compose_extrinsic!(
         api.clone(),
-        "Balances",
-        "transfer",
-        GenericAddress::from(to.0.clone()),
-        Compact(42 as u128)
+        "Sudo",
+        "sudo",
+        call
     );
-
-    println!("[+] Composed Extrinsic:\n {:?}\n", xt);
 
     // send and watch extrinsic until finalized
     let tx_hash = api.send_extrinsic(xt.hex_encode()).unwrap();
