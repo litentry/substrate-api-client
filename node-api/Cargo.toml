@@ -21,15 +21,15 @@ serde_json = { version = "1.0.79", default-features = false, features = ["alloc"
 ac-primitives = { path = "../primitives", default-features = false }
 
 # substrate deps
-frame-support = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.25" }
-frame-system = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.25" }
-sp-core = { default-features = false, features = ["full_crypto"], git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.25" }
-sp-std = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.25" }
-sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.25" }
+frame-support = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+frame-system = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+sp-core = { default-features = false, features = ["full_crypto"], git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+sp-std = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
+sp-runtime = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
 
 # need to add this for `no_std`
-sp-application-crypto = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.25", features = ["full_crypto"] }
-sp-runtime-interface = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.25" }
+sp-application-crypto = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26", features = ["full_crypto"] }
+sp-runtime-interface = { default-features = false, git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.26" }
 
 [features]
 default = ["std"]
