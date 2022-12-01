@@ -15,20 +15,24 @@ pub use sp_runtime::{
 };
 pub use sp_std::prelude::*;
 pub use sp_version::RuntimeVersion;
+pub use std::sync::mpsc::Sender as ThreadOut;
 pub use transaction_payment::FeeDetails;
 
 pub mod error;
 pub mod rpc;
 
 use std::convert::{TryFrom, TryInto};
+use std::sync::mpsc::{Receiver, Sender};
 
+use ac_node_api::events::{EventsDecoder, Raw, RawEvent};
 use codec::{Decode, Encode};
-use log::{debug, info};
+use log::{debug, error, info};
 use serde::de::DeserializeOwned;
 use sp_rpc::number::NumberOrHex;
 use transaction_payment::{InclusionFee, RuntimeDispatchInfo};
 
 use crate::rpc::json_req;
+use crate::utils;
 
 pub trait RpcClient {
     /// Sends a RPC request that returns a String
@@ -36,6 +40,10 @@ pub trait RpcClient {
 
     /// Send a RPC request that returns a SHA256 hash
     fn send_extrinsic(&self, xthex_prefixed: String, exit_on: XtStatus) -> ApiResult<Option<Hash>>;
+}
+
+pub trait Subscriber {
+    fn start_subscriber(&self, json_req: String, result_in: Sender<String>) -> ApiResult<()>;
 }
 
 /// Api to talk with substrate-nodes
@@ -49,6 +57,7 @@ pub trait RpcClient {
 /// use substrate_api_client::{
 ///     Api, ApiClientError, ApiResult, FromHexString, Hash, RpcClient, Value, XtStatus, PlainTipExtrinsicParams
 /// };
+/// use substrate_api_client::rpc::RpcClientError;
 /// struct MyClient {
 ///     // pick any request crate, such as ureq::Agent
 ///     _inner: (),
@@ -76,7 +85,7 @@ pub trait RpcClient {
 ///     fn get_request(&self, jsonreq: serde_json::Value) -> ApiResult<String> {
 ///         self.send_json::<Value>("".into(), jsonreq)
 ///             .map(|v| v.to_string())
-///             .map_err(|err| ApiClientError::RpcClient(err.to_string()))
+///             .map_err(|err| ApiClientError::RpcClient(RpcClientError::Serde(e)))
 ///     }
 ///
 ///     fn send_extrinsic(
@@ -87,7 +96,7 @@ pub trait RpcClient {
 ///         let jsonreq = author_submit_extrinsic(&xthex_prefixed);
 ///         let res: String = self
 ///             .send_json("".into(), jsonreq)
-///             .map_err(|err| ApiClientError::RpcClient(err.to_string()))?;
+///             .map_err(|err| ApiClientError::RpcClient(RpcClientError::Serde(e)))?;
 ///         Ok(Some(Hash::from_hex(res)?))
 ///     }
 /// }
@@ -522,7 +531,7 @@ where
         self.get_constant("Balances", "ExistentialDeposit")
     }
 
-    #[cfg(feature = "ws-client")]
+    #[cfg(any(feature = "ws-client", feature = "tungstenite-client"))]
     pub fn send_extrinsic(
         &self,
         xthex_prefixed: String,
@@ -532,12 +541,82 @@ where
         self.client.send_extrinsic(xthex_prefixed, exit_on)
     }
 
-    #[cfg(not(feature = "ws-client"))]
+    #[cfg(all(not(feature = "ws-client"), not(feature = "tungstenite-client")))]
     pub fn send_extrinsic(&self, xthex_prefixed: String) -> ApiResult<Option<Hash>> {
         debug!("sending extrinsic: {:?}", xthex_prefixed);
         // XtStatus should never be used used but we need to put something
         self.client
             .send_extrinsic(xthex_prefixed, XtStatus::Broadcast)
+    }
+}
+
+impl<P, Client, Params> Api<P, Client, Params>
+where
+    P: Pair,
+    MultiSignature: From<P::Signature>,
+    Client: RpcClient + Subscriber,
+    Params: ExtrinsicParams,
+{
+    pub fn subscribe_events(&self, sender: ThreadOut<String>) -> ApiResult<()> {
+        debug!("subscribing to events");
+        let key = utils::storage_key("System", "Events");
+        let jsonreq = json_req::state_subscribe_storage(vec![key]).to_string();
+        self.client
+            .start_subscriber(jsonreq, sender)
+            .map_err(|e| e.into())
+    }
+
+    pub fn subscribe_finalized_heads(&self, sender: ThreadOut<String>) -> ApiResult<()> {
+        debug!("subscribing to finalized heads");
+        let jsonreq = json_req::chain_subscribe_finalized_heads().to_string();
+        self.client.start_subscriber(jsonreq, sender)
+    }
+
+    pub fn wait_for_event<E: Decode>(
+        &self,
+        module: &str,
+        variant: &str,
+        decoder: Option<EventsDecoder>,
+        receiver: &Receiver<String>,
+    ) -> ApiResult<E> {
+        let raw = self.wait_for_raw_event(module, variant, decoder, receiver)?;
+        E::decode(&mut &raw.data[..]).map_err(|e| e.into())
+    }
+
+    pub fn wait_for_raw_event(
+        &self,
+        module: &str,
+        variant: &str,
+        decoder: Option<EventsDecoder>,
+        receiver: &Receiver<String>,
+    ) -> ApiResult<RawEvent> {
+        let event_decoder = match decoder {
+            Some(d) => d,
+            None => EventsDecoder::new(self.metadata.clone()),
+        };
+
+        loop {
+            let event_str = receiver.recv()?;
+            let _events = event_decoder.decode_events(&mut Vec::from_hex(event_str)?.as_slice());
+            info!("wait for raw event");
+            match _events {
+                Ok(raw_events) => {
+                    for (phase, event) in raw_events.into_iter() {
+                        info!("Decoded Event: {:?}, {:?}", phase, event);
+                        match event {
+                            Raw::Event(raw) if raw.pallet == module && raw.variant == variant => {
+                                return Ok(raw);
+                            }
+                            Raw::Error(runtime_error) => {
+                                error!("Some extrinsic Failed: {:?}", runtime_error);
+                            }
+                            _ => debug!("ignoring unsupported module event: {:?}", event),
+                        }
+                    }
+                }
+                Err(error) => error!("couldn't decode event record list: {:?}", error),
+            }
+        }
     }
 }
 

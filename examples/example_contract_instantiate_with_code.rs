@@ -20,7 +20,14 @@ use std::sync::mpsc::channel;
 use clap::{load_yaml, App};
 use codec::Decode;
 use sp_keyring::AccountKeyring;
-use substrate_api_client::{rpc::WsRpcClient, AccountId, Api, PlainTipExtrinsicParams, XtStatus};
+
+#[cfg(feature = "ws-client")]
+use substrate_api_client::rpc::WsRpcClient;
+
+#[cfg(feature = "tungstenite-client")]
+use substrate_api_client::rpc::TungsteniteRpcClient;
+
+use substrate_api_client::{AccountId, Api, PlainTipExtrinsicParams, XtStatus};
 
 #[allow(unused)]
 #[derive(Decode)]
@@ -35,7 +42,12 @@ fn main() {
 
     // initialize api and set the signer (sender) that is used to sign the extrinsics
     let from = AccountKeyring::Alice.pair();
+    #[cfg(feature = "ws-client")]
     let client = WsRpcClient::new(&url);
+
+    #[cfg(feature = "tungstenite-client")]
+    let client = TungsteniteRpcClient::new(&url, 100);
+
     let api = Api::<_, _, PlainTipExtrinsicParams>::new(client)
         .map(|api| api.set_signer(from))
         .unwrap();

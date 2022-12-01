@@ -24,7 +24,12 @@ use sp_keyring::AccountKeyring;
 use sp_runtime::generic::Era;
 use sp_runtime::MultiAddress;
 
+#[cfg(feature = "ws-client")]
 use substrate_api_client::rpc::WsRpcClient;
+
+#[cfg(feature = "tungstenite-client")]
+use substrate_api_client::rpc::TungsteniteRpcClient;
+
 use substrate_api_client::{
     compose_extrinsic_offline, Api, PlainTipExtrinsicParams, UncheckedExtrinsicV4, XtStatus,
 };
@@ -35,7 +40,11 @@ fn main() {
 
     // initialize api and set the signer (sender) that is used to sign the extrinsics
     let from = AccountKeyring::Alice.pair();
+    #[cfg(feature = "ws-client")]
     let client = WsRpcClient::new(&url);
+
+    #[cfg(feature = "tungstenite-client")]
+    let client = TungsteniteRpcClient::new(&url, 100);
 
     let api = Api::<_, _, PlainTipExtrinsicParams>::new(client)
         .map(|api| api.set_signer(from))

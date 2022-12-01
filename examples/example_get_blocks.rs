@@ -15,7 +15,6 @@
 
 ///! Very simple example that shows how to pretty print the metadata. Has proven to be a helpful
 ///! debugging tool.
-
 #[macro_use]
 extern crate clap;
 
@@ -25,7 +24,13 @@ use node_template_runtime::{Block, Header};
 use sp_core::sr25519;
 use sp_runtime::generic::SignedBlock as SignedBlockG;
 use std::sync::mpsc::channel;
+
+#[cfg(feature = "ws-client")]
 use substrate_api_client::rpc::WsRpcClient;
+
+#[cfg(feature = "tungstenite-client")]
+use substrate_api_client::rpc::TungsteniteRpcClient;
+
 use substrate_api_client::{Api, PlainTipExtrinsicParams};
 
 type SignedBlock = SignedBlockG<Block>;
@@ -34,7 +39,12 @@ fn main() {
     env_logger::init();
     let url = get_node_url_from_cli();
 
+    #[cfg(feature = "ws-client")]
     let client = WsRpcClient::new(&url);
+
+    #[cfg(feature = "tungstenite-client")]
+    let client = TungsteniteRpcClient::new(&url, 100);
+
     let api = Api::<sr25519::Pair, _, PlainTipExtrinsicParams>::new(client).unwrap();
 
     let head = api.get_finalized_head().unwrap().unwrap();

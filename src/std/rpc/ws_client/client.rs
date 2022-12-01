@@ -83,21 +83,17 @@ impl RpcClientTrait for WsRpcClient {
 }
 
 impl Subscriber for WsRpcClient {
-    fn start_subscriber(
-        &self,
-        json_req: String,
-        result_in: ThreadOut<String>,
-    ) -> Result<(), ws::Error> {
+    fn start_subscriber(&self, json_req: String, result_in: ThreadOut<String>) -> ApiResult<()> {
         self.start_subscriber(json_req, result_in)
     }
 }
 
 impl WsRpcClient {
-    pub fn get(&self, json_req: String, result_in: ThreadOut<String>) -> WsResult<()> {
+    pub fn get(&self, json_req: String, result_in: ThreadOut<String>) -> ApiResult<()> {
         self.start_rpc_client_thread(json_req, result_in, on_get_request_msg)
     }
 
-    pub fn send_extrinsic(&self, json_req: String, result_in: ThreadOut<String>) -> WsResult<()> {
+    pub fn send_extrinsic(&self, json_req: String, result_in: ThreadOut<String>) -> ApiResult<()> {
         self.start_rpc_client_thread(json_req, result_in, on_extrinsic_msg_submit_only)
     }
 
@@ -105,7 +101,7 @@ impl WsRpcClient {
         &self,
         json_req: String,
         result_in: ThreadOut<String>,
-    ) -> WsResult<()> {
+    ) -> ApiResult<()> {
         self.start_rpc_client_thread(json_req, result_in, on_extrinsic_msg_until_ready)
     }
 
@@ -113,7 +109,7 @@ impl WsRpcClient {
         &self,
         json_req: String,
         result_in: ThreadOut<String>,
-    ) -> WsResult<()> {
+    ) -> ApiResult<()> {
         self.start_rpc_client_thread(json_req, result_in, on_extrinsic_msg_until_broadcast)
     }
 
@@ -121,7 +117,7 @@ impl WsRpcClient {
         &self,
         json_req: String,
         result_in: ThreadOut<String>,
-    ) -> WsResult<()> {
+    ) -> ApiResult<()> {
         self.start_rpc_client_thread(json_req, result_in, on_extrinsic_msg_until_in_block)
     }
 
@@ -129,11 +125,15 @@ impl WsRpcClient {
         &self,
         json_req: String,
         result_in: ThreadOut<String>,
-    ) -> WsResult<()> {
+    ) -> ApiResult<()> {
         self.start_rpc_client_thread(json_req, result_in, on_extrinsic_msg_until_finalized)
     }
 
-    pub fn start_subscriber(&self, json_req: String, result_in: ThreadOut<String>) -> WsResult<()> {
+    pub fn start_subscriber(
+        &self,
+        json_req: String,
+        result_in: ThreadOut<String>,
+    ) -> ApiResult<()> {
         self.start_rpc_client_thread(json_req, result_in, on_subscription_msg)
     }
 
@@ -142,19 +142,19 @@ impl WsRpcClient {
         jsonreq: String,
         result_in: ThreadOut<String>,
         on_message_fn: OnMessageFn,
-    ) -> WsResult<()> {
+    ) -> ApiResult<()> {
         let url = self.url.clone();
-        let _client =
-            thread::Builder::new()
-                .name("client".to_owned())
-                .spawn(move || -> WsResult<()> {
-                    connect(url, |out| RpcClient {
-                        out,
-                        request: jsonreq.clone(),
-                        result: result_in.clone(),
-                        on_message_fn,
-                    })
-                })?;
+        let _client = thread::Builder::new()
+            .name("client".to_owned())
+            .spawn(move || -> WsResult<()> {
+                connect(url, |out| RpcClient {
+                    out,
+                    request: jsonreq.clone(),
+                    result: result_in.clone(),
+                    on_message_fn,
+                })
+            })
+            .map_err(|e| ApiClientError::Other(Box::new(e).into()))?;
         Ok(())
     }
 

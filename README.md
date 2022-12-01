@@ -1,3 +1,5 @@
+
+
 # substrate-api-client
 
 <p align="center">
@@ -40,7 +42,7 @@ To run an example, clone the `substrate-api-client` repository and run the desir
 ```bash
     git clone https://github.com/scs/substrate-api-client.git
     cd substrate-api-client
-    cargo run --example example_get_storage
+    cargo run --no-default-features --features tungstenite-client,std --example example_get_storage
 ```
 
 Set the output verbosity by prepending `RUST_LOG=info` or `RUST_LOG=debug`.

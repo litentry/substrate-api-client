@@ -1,3 +1,4 @@
+use crate::rpc::RpcClientError;
 use crate::std::rpc::XtStatus;
 use ac_node_api::metadata::{InvalidMetadataError, MetadataError};
 
@@ -16,8 +17,11 @@ pub enum Error {
     #[cfg(feature = "ws-client")]
     #[error("WebSocket Error: {0}")]
     WebSocket(#[from] ws::Error),
+    #[cfg(feature = "tungstenite-client")]
+    #[error("WebSocket Error: {0}")]
+    TungsteniteWebSocket(#[from] tungstenite::Error),
     #[error("RpcClient error: {0}")]
-    RpcClient(String),
+    RpcClient(#[from] RpcClientError),
     #[error("ChannelReceiveError, sender is disconnected: {0}")]
     Disconnected(#[from] sp_std::sync::mpsc::RecvError),
     #[error("Metadata Error: {0:?}")]
@@ -37,6 +41,10 @@ pub enum Error {
     UnsupportedXtStatus(XtStatus),
     #[error("Error converting NumberOrHex to Balance")]
     TryFromIntError,
+    #[error("Exceeded the maximum number of attempts to connect to the server")]
+    ConnectionAttemptsExceeded,
+    #[error("Unable to parse url: {0:?}")]
+    URL(#[from] url::ParseError),
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 }

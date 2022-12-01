@@ -17,7 +17,13 @@
 use clap::{load_yaml, App};
 
 use sp_keyring::AccountKeyring;
+
+#[cfg(feature = "ws-client")]
 use substrate_api_client::rpc::WsRpcClient;
+
+#[cfg(feature = "tungstenite-client")]
+use substrate_api_client::rpc::TungsteniteRpcClient;
+
 use substrate_api_client::Api;
 use substrate_api_client::{AccountInfo, PlainTipExtrinsicParams};
 
@@ -25,7 +31,12 @@ fn main() {
     env_logger::init();
     let url = get_node_url_from_cli();
 
+    #[cfg(feature = "ws-client")]
     let client = WsRpcClient::new(&url);
+
+    #[cfg(feature = "tungstenite-client")]
+    let client = TungsteniteRpcClient::new(&url, 100);
+
     let mut api = Api::<_, _, PlainTipExtrinsicParams>::new(client).unwrap();
 
     // get some plain storage value

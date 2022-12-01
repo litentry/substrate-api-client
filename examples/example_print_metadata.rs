@@ -24,14 +24,25 @@ use clap::App;
 use sp_core::sr25519;
 
 use std::convert::TryFrom;
+
+#[cfg(feature = "ws-client")]
 use substrate_api_client::rpc::WsRpcClient;
+
+#[cfg(feature = "tungstenite-client")]
+use substrate_api_client::rpc::TungsteniteRpcClient;
+
 use substrate_api_client::{Api, Metadata, PlainTipExtrinsicParams};
 
 fn main() {
     env_logger::init();
     let url = get_node_url_from_cli();
 
+    #[cfg(feature = "ws-client")]
     let client = WsRpcClient::new(&url);
+
+    #[cfg(feature = "tungstenite-client")]
+    let client = TungsteniteRpcClient::new(&url, 100);
+
     let api = Api::<sr25519::Pair, _, PlainTipExtrinsicParams>::new(client).unwrap();
 
     let meta = Metadata::try_from(api.get_metadata().unwrap()).unwrap();

@@ -14,29 +14,22 @@
    limitations under the License.
 
 */
-use std::sync::mpsc::{Receiver, SendError, Sender as ThreadOut};
-
-use ac_node_api::events::{EventsDecoder, Raw, RawEvent};
 use ac_primitives::ExtrinsicParams;
-use codec::Decode;
 use log::{debug, error, info, warn};
-use serde_json::Value;
-use sp_core::Pair;
-use sp_runtime::MultiSignature;
-use ws::{CloseCode, Error, Handler, Handshake, Message, Result as WsResult, Sender};
+use std::sync::mpsc::{SendError, Sender as ThreadOut};
+use ws::{CloseCode, Handler, Handshake, Message, Result as WsResult, Sender};
 
 use crate::std::rpc::RpcClientError;
-use crate::std::{json_req, FromHexString, RpcClient as RpcClientTrait, XtStatus};
+use crate::std::XtStatus;
 use crate::std::{Api, ApiResult};
-use crate::utils;
+use crate::Subscriber;
 
+use crate::rpc::{parse_status, result_from_json_response};
 pub use client::WsRpcClient;
 
 pub mod client;
 
 pub type OnMessageFn = fn(msg: Message, out: Sender, result: ThreadOut<String>) -> WsResult<()>;
-
-type RpcResult<T> = Result<T, RpcClientError>;
 
 pub struct RpcClient {
     pub out: Sender,
@@ -57,11 +50,6 @@ impl Handler for RpcClient {
     }
 }
 
-pub trait Subscriber {
-    fn start_subscriber(&self, json_req: String, result_in: ThreadOut<String>)
-        -> Result<(), Error>;
-}
-
 impl<P, Params> Api<P, WsRpcClient, Params>
 where
     Params: ExtrinsicParams,
@@ -69,78 +57,6 @@ where
     pub fn default_with_url(url: &str) -> ApiResult<Self> {
         let client = WsRpcClient::new(url);
         Self::new(client)
-    }
-}
-
-impl<P, Client, Params> Api<P, Client, Params>
-where
-    P: Pair,
-    MultiSignature: From<P::Signature>,
-    Client: RpcClientTrait + Subscriber,
-    Params: ExtrinsicParams,
-{
-    pub fn subscribe_events(&self, sender: ThreadOut<String>) -> ApiResult<()> {
-        debug!("subscribing to events");
-        let key = utils::storage_key("System", "Events");
-        let jsonreq = json_req::state_subscribe_storage(vec![key]).to_string();
-        self.client
-            .start_subscriber(jsonreq, sender)
-            .map_err(|e| e.into())
-    }
-
-    pub fn subscribe_finalized_heads(&self, sender: ThreadOut<String>) -> ApiResult<()> {
-        debug!("subscribing to finalized heads");
-        let jsonreq = json_req::chain_subscribe_finalized_heads().to_string();
-        self.client
-            .start_subscriber(jsonreq, sender)
-            .map_err(|e| e.into())
-    }
-
-    pub fn wait_for_event<E: Decode>(
-        &self,
-        module: &str,
-        variant: &str,
-        decoder: Option<EventsDecoder>,
-        receiver: &Receiver<String>,
-    ) -> ApiResult<E> {
-        let raw = self.wait_for_raw_event(module, variant, decoder, receiver)?;
-        E::decode(&mut &raw.data[..]).map_err(|e| e.into())
-    }
-
-    pub fn wait_for_raw_event(
-        &self,
-        module: &str,
-        variant: &str,
-        decoder: Option<EventsDecoder>,
-        receiver: &Receiver<String>,
-    ) -> ApiResult<RawEvent> {
-        let event_decoder = match decoder {
-            Some(d) => d,
-            None => EventsDecoder::new(self.metadata.clone()),
-        };
-
-        loop {
-            let event_str = receiver.recv()?;
-            let _events = event_decoder.decode_events(&mut Vec::from_hex(event_str)?.as_slice());
-            info!("wait for raw event");
-            match _events {
-                Ok(raw_events) => {
-                    for (phase, event) in raw_events.into_iter() {
-                        info!("Decoded Event: {:?}, {:?}", phase, event);
-                        match event {
-                            Raw::Event(raw) if raw.pallet == module && raw.variant == variant => {
-                                return Ok(raw);
-                            }
-                            Raw::Error(runtime_error) => {
-                                error!("Some extrinsic Failed: {:?}", runtime_error);
-                            }
-                            _ => debug!("ignoring unsupported module event: {:?}", event),
-                        }
-                    }
-                }
-                Err(error) => error!("couldn't decode event record list: {:?}", error),
-            }
-        }
     }
 }
 
@@ -303,68 +219,6 @@ fn end_process(out: Sender, result: ThreadOut<String>, value: Option<String>) ->
     result
         .send(val)
         .map_err(|e| Box::new(RpcClientError::Send(e)).into())
-}
-
-fn parse_status(msg: &str) -> RpcResult<(XtStatus, Option<String>)> {
-    let value: serde_json::Value = serde_json::from_str(msg)?;
-
-    if value["error"].as_object().is_some() {
-        return Err(into_extrinsic_err(&value));
-    }
-
-    match value["params"]["result"].as_object() {
-        Some(obj) => {
-            if let Some(hash) = obj.get("finalized") {
-                info!("finalized: {:?}", hash);
-                Ok((XtStatus::Finalized, Some(hash.to_string())))
-            } else if let Some(hash) = obj.get("inBlock") {
-                info!("inBlock: {:?}", hash);
-                Ok((XtStatus::InBlock, Some(hash.to_string())))
-            } else if let Some(array) = obj.get("broadcast") {
-                info!("broadcast: {:?}", array);
-                Ok((XtStatus::Broadcast, Some(array.to_string())))
-            } else {
-                Ok((XtStatus::Unknown, None))
-            }
-        }
-        None => match value["params"]["result"].as_str() {
-            Some("ready") => Ok((XtStatus::Ready, None)),
-            Some("future") => Ok((XtStatus::Future, None)),
-            Some(&_) => Ok((XtStatus::Unknown, None)),
-            None => Ok((XtStatus::Unknown, None)),
-        },
-    }
-}
-
-/// Todo: this is the code that was used in `parse_status` Don't we want to just print the
-/// error as is instead of introducing our custom format here?
-fn into_extrinsic_err(resp_with_err: &Value) -> RpcClientError {
-    let err_obj = resp_with_err["error"].as_object().unwrap();
-
-    let error = err_obj
-        .get("message")
-        .map_or_else(|| "", |e| e.as_str().unwrap());
-    let code = err_obj
-        .get("code")
-        .map_or_else(|| -1, |c| c.as_i64().unwrap());
-    let details = err_obj
-        .get("data")
-        .map_or_else(|| "", |d| d.as_str().unwrap());
-
-    RpcClientError::Extrinsic(format!(
-        "extrinsic error code {}: {}: {}",
-        code, error, details
-    ))
-}
-
-fn result_from_json_response(resp: &str) -> RpcResult<String> {
-    let value: serde_json::Value = serde_json::from_str(resp)?;
-
-    let resp = value["result"]
-        .as_str()
-        .ok_or_else(|| into_extrinsic_err(&value))?;
-
-    Ok(resp.to_string())
 }
 
 #[cfg(test)]

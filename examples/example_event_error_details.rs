@@ -22,7 +22,13 @@ use sp_keyring::AccountKeyring;
 use sp_runtime::app_crypto::sp_core::sr25519;
 use sp_runtime::AccountId32 as AccountId;
 use sp_runtime::MultiAddress;
+
+#[cfg(feature = "ws-client")]
 use substrate_api_client::rpc::WsRpcClient;
+
+#[cfg(feature = "tungstenite-client")]
+use substrate_api_client::rpc::TungsteniteRpcClient;
+
 use substrate_api_client::{Api, ApiResult, PlainTipExtrinsicParams, XtStatus};
 
 // Look at the how the transfer event looks like in in the metadata
@@ -40,7 +46,12 @@ fn main() {
     // initialize api and set the signer (sender) that is used to sign the extrinsics
     let from = AccountKeyring::Alice.pair();
 
+    #[cfg(feature = "ws-client")]
     let client = WsRpcClient::new(&url);
+
+    #[cfg(feature = "tungstenite-client")]
+    let client = TungsteniteRpcClient::new(&url, 100);
+
     let api = Api::<sr25519::Pair, _, PlainTipExtrinsicParams>::new(client)
         .map(|api| api.set_signer(from.clone()))
         .unwrap();

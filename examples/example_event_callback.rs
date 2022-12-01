@@ -27,7 +27,13 @@ use sp_core::H256 as Hash;
 // Replace this crate by your own if you run a custom substrate node to get your custom events.
 use node_template_runtime::Event;
 
+
+#[cfg(feature = "ws-client")]
 use substrate_api_client::rpc::WsRpcClient;
+
+#[cfg(feature = "tungstenite-client")]
+use substrate_api_client::rpc::TungsteniteRpcClient;
+
 use substrate_api_client::utils::FromHexString;
 use substrate_api_client::{Api, PlainTipExtrinsicParams};
 
@@ -35,7 +41,12 @@ fn main() {
     env_logger::init();
     let url = get_node_url_from_cli();
 
+    #[cfg(feature = "ws-client")]
     let client = WsRpcClient::new(&url);
+
+    #[cfg(feature = "tungstenite-client")]
+    let client = TungsteniteRpcClient::new(&url, 100);
+
     let api = Api::<sr25519::Pair, _, PlainTipExtrinsicParams>::new(client).unwrap();
 
     println!("Subscribe to events");
