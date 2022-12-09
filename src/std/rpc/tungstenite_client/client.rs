@@ -281,11 +281,11 @@ impl TungsteniteRpcClient {
                                 Ok(msg_from_req) => {
                                     debug!("response message: {:?}", msg_from_req);
                                     loop {
-                                        let msg = read_until_text_message(&mut socket);
-                                        if msg.is_err() {
-                                            error!("err:{:?}", msg.unwrap_err());
-                                            break;
-                                        }
+                                        // let msg = read_until_text_message(&mut socket);
+                                        // if msg.is_err() {
+                                        //     error!("err:{:?}", msg.unwrap_err());
+                                        //     break;
+                                        // }
 
                                         match on_message_fn(&mut socket) {
                                             Ok(msg) => {
