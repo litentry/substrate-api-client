@@ -28,11 +28,8 @@ pub trait AssetsConfig: crate::FrameSystemConfig {
 		+ MaybeSerializeDeserialize
 		+ MaxEncodedLen
 		+ TypeInfo;
-	type RemoveItemsLimit: Get<u32>;
 	type AssetId: Member + Copy + MaybeSerializeDeserialize + MaxEncodedLen;
-	type AssetIdParameter: Copy + From<Self::AssetId> + Into<Self::AssetId> + MaxEncodedLen;
 	type Currency;
-	type CreateOrigin;
 	type ForceOrigin;
 	type AssetDeposit;
 	type AssetAccountDeposit;
@@ -52,11 +49,8 @@ where
 {
 	type RuntimeEvent = <T as pallet_assets::Config>::RuntimeEvent;
 	type Balance = T::Balance;
-	type RemoveItemsLimit = T::RemoveItemsLimit;
 	type AssetId = T::AssetId;
-	type AssetIdParameter = T::AssetIdParameter;
 	type Currency = T::Currency;
-	type CreateOrigin = T::CreateOrigin;
 	type ForceOrigin = T::ForceOrigin;
 	type AssetDeposit = T::AssetDeposit;
 	type AssetAccountDeposit = T::AssetAccountDeposit;
