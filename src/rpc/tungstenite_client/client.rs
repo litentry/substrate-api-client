@@ -150,6 +150,11 @@ fn send_message_to_client(result_in: ThreadOut<String>, message: &str) -> Result
 	debug!("got on_subscription_msg {}", message);
 	let value: Value = serde_json::from_str(message)?;
 
+	if value["error"].as_object().is_some() {
+		warn!("got error msg {}", value["error"]);
+		result_in.send(value["error"].to_string())?;
+		return Ok(())
+	}
 	match value["id"].as_str() {
 		Some(_idstr) => {
 			warn!("Expected subscription, but received an id response instead: {:?}", value);
