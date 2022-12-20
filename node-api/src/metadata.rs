@@ -68,6 +68,7 @@ pub enum MetadataError {
 }
 
 #[derive(Clone, Debug, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Serialize))]
 pub struct Metadata {
 	pub metadata: RuntimeMetadataLastVersion,
 	pub pallets: BTreeMap<String, PalletMetadata>,
@@ -172,6 +173,7 @@ impl Metadata {
 
 /// Metadata for a specific pallet.
 #[derive(Clone, Debug, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Serialize))]
 pub struct PalletMetadata {
 	pub index: u8,
 	pub name: String,
@@ -234,6 +236,7 @@ impl PalletMetadata {
 
 /// Metadata for specific field.
 #[derive(Clone, Debug, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Serialize))]
 pub struct EventFieldMetadata {
 	name: Option<String>,
 	type_name: Option<String>,
@@ -264,6 +267,7 @@ impl EventFieldMetadata {
 
 /// Metadata for specific events.
 #[derive(Clone, Debug, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Serialize))]
 pub struct EventMetadata {
 	pallet: String,
 	event: String,
@@ -294,6 +298,7 @@ impl EventMetadata {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Serialize))]
 pub struct ErrorMetadata {
 	pallet: String,
 	error: String,
